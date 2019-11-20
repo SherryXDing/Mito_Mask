@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
     img_name = '/groups/flyem/data/dingx/mask/data/trvol-250-1.h5'
     mask_name = '/groups/flyem/data/dingx/mask/data/trvol-250-1-mask.h5'
-    Data = GenerateData(img_name, mask_name, transform=transforms.Compose([FlipSample(), RotSample(), ToTensor()]))
+    Data = GenerateData(img_name, mask_name, crop_sz=(108,108,108), transform=transforms.Compose([FlipSample(), RotSample(), ToTensor()]))
     print(len(Data))
     print(len(Data.pos_idx))
     print(len(Data.neg_idx))

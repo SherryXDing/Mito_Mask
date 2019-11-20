@@ -129,7 +129,7 @@ class NeuralNetwork():
         self.model.eval()
 
         gap = ((input_sz[0]-step[0])//2, (input_sz[1]-step[1])//2, (input_sz[2]-step[2])//2)
-
+        
         out = np.zeros(img.shape, dtype=img.dtype)
         for row in range(0, img.shape[0]-input_sz[0], step[0]):
             for col in range(0, img.shape[1]-input_sz[1], step[1]):
@@ -143,6 +143,6 @@ class NeuralNetwork():
                     patch_out = self.model(patch_img)
                     patch_out = patch_out.cpu()
                     patch_out = patch_out.detach().numpy()
-                    out[row+gap[0]:row+input_sz[0]-gap[0], col+gap[1]:col+input_sz[1]-gap[1], vol+gap[2]:vol+input_sz[2]-gap[2]] = patch_phi[0,0,:,:,:]
+                    out[row+gap[0]:row+input_sz[0]-gap[0], col+gap[1]:col+input_sz[1]-gap[1], vol+gap[2]:vol+input_sz[2]-gap[2]] = patch_out[0,0,:,:,:]
                     
         return out
