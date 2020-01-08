@@ -60,6 +60,8 @@ class GenerateData(Dataset):
         img_name: name of image data
         mask_name: name of mask (1-positive samples, 0-negative samples, 2-unmasked)
         crop_sz: cropping size 
+        num_data: generated sample size
+        transform: data augmentation
         """
         self.img = np.float32(h5py.File(img_name,'r')['raw'][()])
         self.img = (self.img - self.img.mean()) / self.img.std()  # normalize image
@@ -98,6 +100,60 @@ class GenerateData(Dataset):
         return [pos_img, pos_mask], [neg_img, neg_mask]
 
 
+class GenerateData_Multi(Dataset):
+    """
+    Generate training and validation dataset using multiple image and mask pairs
+    """
+    def __init__(self, img_mask_name, crop_sz=(64,64,64), num_data=10000, transform=None):
+        """
+        Args:
+        img_mask_name: list of name pairs of image and mask data, each pair is a tuple of (img_name, mask_name)
+            For mask, 1-positive samples, 0-negative samples, 2-unmasked
+        crop_sz: cropping size 
+        num_data: generated sample size
+        transform: data augmentation 
+        """
+        self.img_mask_name = img_mask_name
+        self.crop_sz = crop_sz
+        self.num_data = num_data
+        self.transform = transform
+    
+    def __len__(self):
+        return self.num_data
+
+    def __getitem__(self, idx):
+        pair_idx = np.random.randint(len(self.img_mask_name))
+        pair_name = img_mask_name[pair_idx]
+        img = np.float32(h5py.File(pair_name[0],'r')['raw'][()])
+        img = (img - img.mean()) / img.std()  # normalize image
+        img_shape = img.shape
+        mask = np.float32(h5py.File(pair_name[1], 'r')['raw'][()])
+        assert img_shape == mask.shape, "Error: Image and mask must be in the same shape!"
+        idx = np.where(mask==1)
+        pos_idx = list([idx[0][i],idx[1][i],idx[2][i]] for i in range(len(idx[0])) \
+            if self.crop_sz[0]//2<idx[0][i]<img_shape[0]-self.crop_sz[0]//2 and self.crop_sz[1]//2<idx[1][i]<img_shape[1]-self.crop_sz[1]//2 and self.crop_sz[2]//2<idx[2][i]<img_shape[2]-self.crop_sz[2]//2)  # location of positive samples
+        idx = np.where(mask==0)    
+        neg_idx = list([idx[0][i],idx[1][i],idx[2][i]] for i in range(len(idx[0])) \
+            if self.crop_sz[0]//2<idx[0][i]<img_shape[0]-self.crop_sz[0]//2 and self.crop_sz[1]//2<idx[1][i]<img_shape[1]-self.crop_sz[1]//2 and self.crop_sz[2]//2<idx[2][i]<img_shape[2]-self.crop_sz[2]//2)  # location of negative samples
+
+        # positive sample
+        i = np.random.randint(len(pos_idx))
+        pos_vxl = pos_idx[i]
+        pos_img = img[pos_vxl[0]-self.crop_sz[0]//2:pos_vxl[0]+self.crop_sz[0]//2, pos_vxl[1]-self.crop_sz[1]//2:pos_vxl[1]+self.crop_sz[1]//2, pos_vxl[2]-self.crop_sz[2]//2:pos_vxl[2]+self.crop_sz[2]//2]
+        pos_mask = mask[pos_vxl[0]-self.crop_sz[0]//2:pos_vxl[0]+self.crop_sz[0]//2, pos_vxl[1]-self.crop_sz[1]//2:pos_vxl[1]+self.crop_sz[1]//2, pos_vxl[2]-self.crop_sz[2]//2:pos_vxl[2]+self.crop_sz[2]//2]
+        # negative sample
+        i = np.random.randint(len(neg_idx))
+        neg_vxl = neg_idx[i]
+        neg_img = img[neg_vxl[0]-self.crop_sz[0]//2:neg_vxl[0]+self.crop_sz[0]//2, neg_vxl[1]-self.crop_sz[1]//2:neg_vxl[1]+self.crop_sz[1]//2, neg_vxl[2]-self.crop_sz[2]//2:neg_vxl[2]+self.crop_sz[2]//2]
+        neg_mask = mask[neg_vxl[0]-self.crop_sz[0]//2:neg_vxl[0]+self.crop_sz[0]//2, neg_vxl[1]-self.crop_sz[1]//2:neg_vxl[1]+self.crop_sz[1]//2, neg_vxl[2]-self.crop_sz[2]//2:neg_vxl[2]+self.crop_sz[2]//2]
+        # data augmentation
+        if self.transform is not None:
+            pos_img, pos_mask = self.transform([pos_img, pos_mask])
+            neg_img, neg_mask = self.transform([neg_img, neg_mask])
+        
+        return [pos_img, pos_mask], [neg_img, neg_mask]
+
+
 if __name__ == "__main__":
 
     def view_data(save_name, img):
@@ -109,12 +165,16 @@ if __name__ == "__main__":
             dset[:,:,:] = img_ch0
         return None
 
-    img_name = '/groups/flyem/data/dingx/mask/data/trvol-250-1.h5'
-    mask_name = '/groups/flyem/data/dingx/mask/data/trvol-250-1-mask.h5'
-    Data = GenerateData(img_name, mask_name, crop_sz=(108,108,108), transform=transforms.Compose([FlipSample(), RotSample(), ToTensor()]))
+    # img_name = '/groups/flyem/data/dingx/mask/data/trvol-250-1.h5'
+    # mask_name = '/groups/flyem/data/dingx/mask/data/trvol-250-1-mask.h5'
+    # Data = GenerateData(img_name, mask_name, crop_sz=(108,108,108), transform=transforms.Compose([FlipSample(), RotSample(), ToTensor()]))
+    img_mask_name = [('/groups/flyem/data/dingx/mask/data/trvol-250-1.h5','/groups/flyem/data/dingx/mask/data/trvol-250-1-mask.h5'),\
+        ('/groups/flyem/data/dingx/mask/data/tstvol-520-1.h5','/groups/flyem/data/dingx/mask/data/tstvol-520-1-mask.h5')]
+    Data = GenerateData_Multi(img_mask_name, crop_sz=(108,108,108), transform=transforms.Compose([FlipSample(), RotSample(), ToTensor()]))
+
     print(len(Data))
-    print(len(Data.pos_idx))
-    print(len(Data.neg_idx))
+    # print(len(Data.pos_idx))
+    # print(len(Data.neg_idx))
 
     data = Data.__getitem__(100)
     print(len(data))

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import json
 
 
-# model_path = '/groups/flyem/data/dingx/mask/model_depth3_insz64/'
+# model_path = '/groups/flyem/data/dingx/mask/model_depth4_insz108/'
 # with open(model_path+'loss.json', 'r') as f:
 #     loss = json.load(f)
 # train_loss_total = loss['train_loss_total']
@@ -32,7 +32,7 @@ test_img = (test_img - test_img.mean()) / test_img.std()
 
 # checkpoint
 model_path = '/groups/flyem/data/dingx/mask/model_depth3_insz64/'  # '/groups/flyem/data/dingx/mask/model_depth4_insz108/'
-ckpt_list = ['model_ckpt_2000.pt', 'model_ckpt_4000.pt', 'model_ckpt_6000.pt', 'model_ckpt_8000.pt', 'model_ckpt_10000.pt']
+ckpt_list = ['model_ckpt_1000.pt', 'model_ckpt_3000.pt', 'model_ckpt_5000.pt', 'model_ckpt_7000.pt', 'model_ckpt_9000.pt']
 
 # Define the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

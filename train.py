@@ -12,10 +12,12 @@ import time
 
 
 data_path = '/groups/flyem/data/dingx/mask/data/'
-img_name = data_path+'trvol-250-1.h5'
-mask_name = data_path+'trvol-250-1-mask.h5'
+# img_name = data_path+'trvol-250-1.h5'
+# mask_name = data_path+'trvol-250-1-mask.h5'
+img_mask_name = [(data_path+'trvol-250-1.h5', data_path+'trvol-250-1-mask.h5'), \
+        (data_path+'tstvol-520-1.h5', data_path+'tstvol-520-1-mask.h5')]
 
-save_path = '/groups/flyem/data/dingx/mask/model_depth4_insz108'
+save_path = '/groups/flyem/data/dingx/mask/multidata_model_depth4_insz108'
 if not os.path.exists(save_path):
     os.mkdir(save_path)
 
@@ -51,7 +53,8 @@ for epoch in range(total_epoch):
     print('......Epoch {}......'.format(epoch))
     since = time.time()
     # generate data for each epoch
-    data = GenerateData(img_name, mask_name, crop_sz=crop_sz, num_data=num_data, transform=transform)
+    # data = GenerateData(img_name, mask_name, crop_sz=crop_sz, num_data=num_data, transform=transform)
+    data = GenerateData_Multi(img_mask_name, crop_sz=crop_sz, num_data=num_data, transform=transform)
     indices = range(len(data))
     train_data = Subset(data, indices[:-100])
     eval_data = Subset(data, indices[-100:])
