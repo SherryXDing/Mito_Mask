@@ -100,6 +100,7 @@ class GenerateData(Dataset):
         return [pos_img, pos_mask], [neg_img, neg_mask]
 
 
+# NOT efficient, didn't use
 class GenerateData_Multi(Dataset):
     """
     Generate training and validation dataset using multiple image and mask pairs
@@ -123,7 +124,7 @@ class GenerateData_Multi(Dataset):
 
     def __getitem__(self, idx):
         pair_idx = np.random.randint(len(self.img_mask_name))
-        pair_name = img_mask_name[pair_idx]
+        pair_name = self.img_mask_name[pair_idx]
         img = np.float32(h5py.File(pair_name[0],'r')['raw'][()])
         img = (img - img.mean()) / img.std()  # normalize image
         img_shape = img.shape
