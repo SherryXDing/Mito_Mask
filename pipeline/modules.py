@@ -8,19 +8,20 @@ class NeuralNetwork():
     """
     Network class that wraps model related functions (e.g., training, evaluation, etc)
     """
-    def __init__(self, model, criterion, optimizer, device):
+    def __init__(self, model, criterion, optimizer, device, unmask_label=None):
         """
         Args:
             model: a deep neural network model (sent to device already)
             criterion: loss function
             optimizer: training optimizer
             device: training device
+            unmask_label: label number for unlabeled area
         """
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
-
+        self.unmask_label = unmask_label
 
     def masked_loss(self, out, target):
         """
@@ -28,12 +29,13 @@ class NeuralNetwork():
         """
         if out.shape != target.shape:
             shrink_sz = ((target.shape[2]-out.shape[2])//2, (target.shape[3]-out.shape[3])//2, (target.shape[4]-out.shape[4])//2)
-            target = target[:, :, shrink_sz[0]:-shrink_sz[0], shrink_sz[1]:-shrink_sz[1], shrink_sz[2]:-shrink_sz[2]]
-        mask = target!=2
-        target = mask * target  # target should be numbers between 0 and 1
+            target = target[:, :, shrink_sz[0]:-shrink_sz[0], shrink_sz[1]:-shrink_sz[1], shrink_sz[2]:-shrink_sz[2]]        
+        if self.unmask_label is not None:
+            mask = target[:,-1,:,:,:]!=1  # 1 in the last channel of target indicates unlabeled area  
+            mask = mask.unsqueeze(1)
+            out *= mask
+            target *= mask
         loss = self.criterion(out, target)
-        loss = loss * mask  # masked loss
-        loss = loss.sum() / len(mask[mask])
         return loss
 
 
@@ -48,24 +50,23 @@ class NeuralNetwork():
         training_loss = 0
 
         for batch, sample in enumerate(data):
-            for i in range(len(sample)):
-                img = sample[i][0]
-                mask = sample[i][1]
-                img = img.to(self.device)
-                mask = mask.to(self.device)
-                # Forward
-                out = self.model(img)
-                # Calculate loss
-                loss = self.masked_loss(out, mask)
-                training_loss += loss.item()
-                # Zero the parameter gradients
-                self.optimizer.zero_grad()                    
-                # Backward
-                loss.backward()
-                # Update weights
-                self.optimizer.step()
+            img = sample[0]
+            mask = sample[1]
+            img = img.to(self.device)
+            mask = mask.to(self.device)
+            # Forward
+            out = self.model(img)
+            # Calculate loss
+            loss = self.masked_loss(out, mask)
+            training_loss += loss.item()
+            # Zero the parameter gradients
+            self.optimizer.zero_grad()                    
+            # Backward
+            loss.backward()
+            # Update weights
+            self.optimizer.step()
 
-        batch_loss = training_loss/((batch+1)*2)
+        batch_loss = training_loss/(batch+1)
         return batch_loss
 
 
@@ -80,17 +81,16 @@ class NeuralNetwork():
         eval_loss = 0
 
         for batch, sample in enumerate(data):
-            for i in range(len(sample)):
-                with torch.no_grad():  # Disable gradient computation
-                    img = sample[i][0]
-                    mask = sample[i][1]
-                    img = img.to(self.device)
-                    mask = mask.to(self.device)
-                    out = self.model(img)
-                    loss = self.masked_loss(out, mask)
-                    eval_loss += loss.item()
+            with torch.no_grad():  # Disable gradient computation
+                img = sample[0]
+                mask = sample[1]
+                img = img.to(self.device)
+                mask = mask.to(self.device)
+                out = self.model(img)
+                loss = self.masked_loss(out, mask)
+                eval_loss += loss.item()
 
-        batch_loss = eval_loss/((batch+1)*2)
+        batch_loss = eval_loss/(batch+1)
         return batch_loss
 
 
@@ -114,7 +114,7 @@ class NeuralNetwork():
                         path+"/model_ckpt_{}.pt".format(epoch))
     
 
-    def test_model(self, checkpoint, img, input_sz, step):
+    def test_model(self, checkpoint, img, input_sz, step, normalize=True):
         """
         Test the model on new data
         Args:
@@ -122,15 +122,17 @@ class NeuralNetwork():
             img: testing data in [x, y, z] (network input is [batch, channel, x, y, z])
             input_sz: network input size in (x,y,z) 
             step: moving step in size (x,y,z)
+            normalize: if normalize the img to 0 mean and 1 std
         """
 
         ckpt = torch.load(checkpoint)
         self.model.load_state_dict(ckpt['model_state_dict'])
         self.model.eval()
-
         gap = ((input_sz[0]-step[0])//2, (input_sz[1]-step[1])//2, (input_sz[2]-step[2])//2)
-        
+        if normalize:
+            img = (img - img.mean()) / img.std()
         out = np.zeros(img.shape, dtype=img.dtype)
+        # not parallel processing
         for row in range(0, img.shape[0]-input_sz[0], step[0]):
             for col in range(0, img.shape[1]-input_sz[1], step[1]):
                 for vol in range(0, img.shape[2]-input_sz[2], step[2]):
@@ -143,6 +145,10 @@ class NeuralNetwork():
                     patch_out = self.model(patch_img)
                     patch_out = patch_out.cpu()
                     patch_out = patch_out.detach().numpy()
-                    out[row+gap[0]:row+input_sz[0]-gap[0], col+gap[1]:col+input_sz[1]-gap[1], vol+gap[2]:vol+input_sz[2]-gap[2]] = patch_out[0,0,:,:,:]
+                    if self.unmask_label is not None:
+                        patch_out = np.argmax(patch_out[0,:-1,:,:,:], axis=1)
+                    else:
+                        patch_out = np.argmax(patch_out, axis=1)
+                    out[row+gap[0]:row+input_sz[0]-gap[0], col+gap[1]:col+input_sz[1]-gap[1], vol+gap[2]:vol+input_sz[2]-gap[2]] = patch_out[0,:,:,:]
                     
         return out

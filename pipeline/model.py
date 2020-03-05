@@ -70,7 +70,7 @@ class UNet(nn.Module):
     """
     3D UNet
     """
-    def __init__(self, in_channels=1, base_filters=16, out_channels=1, depth=3, pad=0, bias=False):
+    def __init__(self, in_channels=1, base_filters=16, out_channels=2, depth=3, pad=0, bias=False):
         """
         Args:
         in_channels: number of input channels
@@ -89,7 +89,7 @@ class UNet(nn.Module):
         self.up_modules = nn.ModuleList()
         for i in reversed(range(depth-1)):
             self.up_modules.append(
-                UpBlock(in_ch=in_channels, out_ch=2**i*base_filters, pad=0, bias=False))
+                UpBlock(in_ch=in_channels, out_ch=2**i*base_filters, pad=0, bias=bias))
             in_channels = 2**i*base_filters
         self.final_module = nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
     
@@ -103,7 +103,7 @@ class UNet(nn.Module):
         for i, up in enumerate(self.up_modules):
             img = up(img, down_layers[-1-i])
         img = self.final_module(img)
-        img = torch.sigmoid(img)
+        img = F.softmax(img, dim=-4)
         return img
 
 
