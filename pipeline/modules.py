@@ -23,6 +23,7 @@ class NeuralNetwork():
         self.device = device
         self.unmask_label = unmask_label
 
+
     def masked_loss(self, out, target):
         """
         calculate masked loss
@@ -32,10 +33,13 @@ class NeuralNetwork():
             target = target[:, :, shrink_sz[0]:-shrink_sz[0], shrink_sz[1]:-shrink_sz[1], shrink_sz[2]:-shrink_sz[2]]        
         if self.unmask_label is not None:
             mask = target[:,-1,:,:,:]!=1  # 1 in the last channel of target indicates unlabeled area  
-            mask = mask.unsqueeze(1)
-            out *= mask
-            target *= mask
+        else:
+            mask = torch.ones(target.shape[0], target.shape[2], target.shape[3], target.shape[4], dtype=bool)
+        mask = mask.unsqueeze(1)
+        out = out * mask  
+        target = target * mask 
         loss = self.criterion(out, target)
+        loss = loss.sum() / len(mask[mask])
         return loss
 
 

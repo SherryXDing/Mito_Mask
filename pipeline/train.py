@@ -25,13 +25,13 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # model
 depth = 3
 model = UNet(in_channels=1, base_filters=16, out_channels=3, depth=depth)
-if torch.cuda.device_count()>1:
-    print('---Using {} GPUs---'.format(torch.cuda.device_count()))
-    model = nn.DataParallel(model)
+# if torch.cuda.device_count()>1:
+#     print('---Using {} GPUs---'.format(torch.cuda.device_count()))
+#     model = nn.DataParallel(model)
 model.to(device)
 
 # criterion
-criterion = nn.MSELoss(reduction='sum')
+criterion = nn.MSELoss(reduction='none')
 # optimizer
 optimizer = torch.optim.SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=0.00005, nesterov=True)
 unmask_label=2
@@ -51,7 +51,7 @@ for epoch in range(total_epoch):
     print('......Epoch {}......'.format(epoch))
     since = time.time()
     # generate data for each epoch
-    data = GenerateData(img_name, mask_name, crop_sz=crop_sz, num_data=num_data, transform=transform)
+    data = GenerateData_Multiclass(img_mask_name, crop_sz=crop_sz, num_data=num_data, transform=transform)
     indices = range(len(data))
     train_data = Subset(data, indices[:-100])
     eval_data = Subset(data, indices[-100:])
