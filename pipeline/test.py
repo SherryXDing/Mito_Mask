@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import json
 
 
-# model_path = '/groups/flyem/data/dingx/mask/multidata_model_depth4_insz108/'
+# model_path = '/groups/flyem/data/dingx/mask/model_multiclass/'
 # with open(model_path+'loss.json', 'r') as f:
 #     loss = json.load(f)
 # train_loss_total = loss['train_loss_total']
@@ -31,7 +31,7 @@ test_img = np.float32(h5py.File(test_data,'r')['raw'][()])
 
 # checkpoint
 model_path = '/groups/flyem/data/dingx/mask/model_multiclass/' 
-ckpt_list = ['model_ckpt_1000.pt', 'model_ckpt_2000.pt']
+ckpt_list = ['model_ckpt_100.pt', 'model_ckpt_200.pt']
 
 # Define the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,7 +42,7 @@ if torch.cuda.device_count()>1:
     model = nn.DataParallel(model)
 model.to(device)
 # criterion
-criterion = nn.MSELoss(reduction='sum')
+criterion = nn.MSELoss(reduction='none')
 # optimizer
 optimizer = torch.optim.SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=0.00005, nesterov=True)
 unmask_label=2

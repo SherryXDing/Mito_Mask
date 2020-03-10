@@ -103,8 +103,24 @@ class UNet(nn.Module):
         for i, up in enumerate(self.up_modules):
             img = up(img, down_layers[-1-i])
         img = self.final_module(img)
-        img = F.softmax(img, dim=-4)
+        img = F.softmax(img, dim=1)
         return img
+
+
+class GoogleAlexNet(nn.Module):
+    """
+    AlexNet style network described in Google's email:
+    We used these labels to train a 3d convolutional network that receives as input a field of view of 65x65x65 voxels at [16 nm]^3/voxel resolution. 
+    The network uses ‘valid’ convolution padding and ‘max’ pooling operations with a kernel and striding shape of 2x2x2, 
+    with convolution and pooling operations interleaved in the following sequence: 
+        convolution with 64 features maps and a 3x3x3 kernel shape, max-pooling, 
+        convolution with 64 feature maps, max-pooling, 
+        convolution with 64 feature maps, max-pooling, 
+        convolution with 3x3x3 kernel size and 16 feature maps, 
+        convolution with 4x4x4 kernel shape 512 feature maps (i.e., fully connected layer), 
+        and finally a logistic layer output with 8 units (first unit was unused in the labeling scheme).
+    """
+    pass
 
 
 if __name__ == "__main__":

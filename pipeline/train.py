@@ -25,13 +25,13 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # model
 depth = 3
 model = UNet(in_channels=1, base_filters=16, out_channels=3, depth=depth)
-# if torch.cuda.device_count()>1:
-#     print('---Using {} GPUs---'.format(torch.cuda.device_count()))
-#     model = nn.DataParallel(model)
+if torch.cuda.device_count()>1:
+    print('---Using {} GPUs---'.format(torch.cuda.device_count()))
+    model = nn.DataParallel(model)
 model.to(device)
 
 # criterion
-criterion = nn.MSELoss(reduction='none')
+criterion = nn.CrossEntropyLoss(reduction='none')
 # optimizer
 optimizer = torch.optim.SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=0.00005, nesterov=True)
 unmask_label=2
@@ -40,7 +40,7 @@ network = NeuralNetwork(model, criterion, optimizer, device, unmask_label)
 crop_sz=(64,64,64)
 num_data = 1000
 transform = transforms.Compose([FlipSample(), RotSample(), ToTensor()])
-batch_sz = 16
+batch_sz = 32
 total_epoch = 2000
 train_loss_total = []
 eval_loss_total = []

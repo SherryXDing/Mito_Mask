@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F 
 import numpy as np 
 import os
@@ -35,10 +36,10 @@ class NeuralNetwork():
             mask = target[:,-1,:,:,:]!=1  # 1 in the last channel of target indicates unlabeled area  
         else:
             mask = torch.ones(target.shape[0], target.shape[2], target.shape[3], target.shape[4], dtype=bool)
-        mask = mask.unsqueeze(1)
-        out = out * mask  
-        target = target * mask 
+        mask = mask.unsqueeze(1) 
+        target = torch.argmax(target, dim=1)
         loss = self.criterion(out, target)
+        loss = loss * mask
         loss = loss.sum() / len(mask[mask])
         return loss
 
@@ -150,9 +151,9 @@ class NeuralNetwork():
                     patch_out = patch_out.cpu()
                     patch_out = patch_out.detach().numpy()
                     if self.unmask_label is not None:
-                        patch_out = np.argmax(patch_out[0,:-1,:,:,:], axis=1)
+                        patch_out = np.argmax(patch_out[0,:-1,:,:,:], axis=0)
                     else:
-                        patch_out = np.argmax(patch_out, axis=1)
-                    out[row+gap[0]:row+input_sz[0]-gap[0], col+gap[1]:col+input_sz[1]-gap[1], vol+gap[2]:vol+input_sz[2]-gap[2]] = patch_out[0,:,:,:]
+                        patch_out = np.argmax(patch_out[0,:,:,:,:], axis=0)
+                    out[row+gap[0]:row+input_sz[0]-gap[0], col+gap[1]:col+input_sz[1]-gap[1], vol+gap[2]:vol+input_sz[2]-gap[2]] = patch_out
                     
         return out
