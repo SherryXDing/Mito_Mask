@@ -107,6 +107,8 @@ class UNet(nn.Module):
         return img
 
 
+
+
 class GoogleAlexNet(nn.Module):
     """
     AlexNet style network described in Google's email:
@@ -120,7 +122,38 @@ class GoogleAlexNet(nn.Module):
         convolution with 4x4x4 kernel shape 512 feature maps (i.e., fully connected layer), 
         and finally a logistic layer output with 8 units (first unit was unused in the labeling scheme).
     """
-    pass
+    def __init__(self, in_channels=1, num_classes=8):
+        """
+        Args:
+        in_channels: number of input channels
+        num_classes: number of classes
+        """
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.Conv3d(in_channels=in_channels, out_channels=64, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=2),
+            nn.Conv3d(in_channels=64, out_channels=64, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=2),
+            nn.Conv3d(in_channels=64, out_channels=64, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=2),
+            nn.Conv3d(in_channels=64, out_channels=16, kernel_size=3, stride=2),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(in_channels=16, out_channels=16, kernel_size=4, stride=2),
+            nn.ReLU(inplace=True)
+        )
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(in_features=512, out_features=num_classes)
+        )
+
+    def forward(self, img):
+        img = self.convs(img)
+        img = torch.flatten(img, 1)
+        img = self.classifier(img)
+        return img
 
 
 if __name__ == "__main__":

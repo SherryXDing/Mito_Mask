@@ -15,11 +15,11 @@ class FlipSample():
         mask = sample[1]
         opt = np.random.randint(3)
         if opt == 1:
-            img = np.flip(img, axis=1)
-            mask = np.flip(mask, axis=1)
+            img = np.flip(img, axis=0)
+            mask = np.flip(mask, axis=0)
         elif opt == 2:
-            img = np.flip(img, axis=3)
-            mask = np.flip(mask, axis=3)
+            img = np.flip(img, axis=2)
+            mask = np.flip(mask, axis=2)
         return img, mask
 
 
@@ -32,8 +32,8 @@ class RotSample():
         mask = sample[1]
         k = np.random.randint(4)
         if k:
-            img = np.rot90(img, k, axes=(1,2))
-            mask = np.rot90(mask, k, axes=(1,2))
+            img = np.rot90(img, k, axes=(0,1))
+            mask = np.rot90(mask, k, axes=(0,1))
         return img, mask
 
 
@@ -49,16 +49,17 @@ class GaussianNoise():
         mask = sample[1]
         opt = np.random.randint(2)
         if opt == 1:
-            img = img + np.random.randn(img.shape[0], img.shape[1], img.shape[2], img.shape[3])*self.std + self.mu
+            img = img + np.random.randn(img.shape[0], img.shape[1], img.shape[2])*self.std + self.mu
         return img, mask
 
 
 class ToTensor():
     """
-    Convert image and mask into tensors, both in shape [channel, x, y, z]
+    Convert image and mask into tensors, image in shape [channel,x,y,z], mask in shape [x,y,z]
     """
     def __call__(self, sample):
         img = sample[0]
+        img = np.expand_dims(img, axis=0)
         mask = sample[1]
         img = torch.from_numpy(img.copy())
         mask = torch.from_numpy(mask.copy())
@@ -88,27 +89,13 @@ class GenerateData_Multiclass(Dataset):
             curr_name = img_mask_name[i]
             assert os.path.exists(curr_name[0]) and os.path.exists(curr_name[1]), \
                 'Image or mask does not exist!'
-            # prepare image in shape [channel, x, y, z]
+            # prepare image in shape [x, y, z]
             img = np.float32(h5py.File(curr_name[0],'r')['raw'][()])
             if normalize:
                 img = (img - img.mean()) / img.std()
-            img = np.expand_dims(img, axis=0)
             self.img_all[str(i)] = img
-            # prepare mask in shape [channel, x, y, z], number of channels = number of classes
-            labeled_mask = np.float32(h5py.File(curr_name[1], 'r')['raw'][()])
-            labels = np.unique(labeled_mask)
-            mask = []
-            for lbl in labels:
-                if self.unmask_label is not None and lbl == self.unmask_label:
-                    continue
-                channel_mask = np.zeros(labeled_mask.shape, dtype=labeled_mask.dtype)
-                channel_mask[labeled_mask==lbl] = 1
-                mask.append(channel_mask)
-            if self.unmask_label is not None:
-                channel_mask = np.zeros(labeled_mask.shape, dtype=labeled_mask.dtype)
-                channel_mask[labeled_mask==self.unmask_label] = 1
-                mask.append(channel_mask)  # unlabeled area mask is always the last channel
-            mask = np.asarray(mask)
+            # prepare mask in shape [x, y, z]
+            mask = np.float32(h5py.File(curr_name[1],'r')['raw'][()])
             self.mask_all[str(i)] = mask
         
         self.crop_sz = crop_sz
@@ -126,13 +113,16 @@ class GenerateData_Multiclass(Dataset):
         # generate data
         is_accept = False
         while is_accept is not True:
-            loc_x = np.random.randint(0, sz[1]-self.crop_sz[0])
-            loc_y = np.random.randint(0, sz[2]-self.crop_sz[1])
-            loc_z = np.random.randint(0, sz[3]-self.crop_sz[2])
-            sample_mask = mask[:, loc_x:loc_x+self.crop_sz[0], loc_y:loc_y+self.crop_sz[1], loc_z:loc_z+self.crop_sz[2]]
-            if (self.unmask_label is not None and np.count_nonzero(sample_mask) > 100) or (self.unmask_label is None and np.count_nonzero(sample_mask[:-1,:,:,:]) > 100):
+            loc_x = np.random.randint(0, sz[0]-self.crop_sz[0])
+            loc_y = np.random.randint(0, sz[1]-self.crop_sz[1])
+            loc_z = np.random.randint(0, sz[2]-self.crop_sz[2])
+            sample_mask = mask[loc_x:loc_x+self.crop_sz[0], loc_y:loc_y+self.crop_sz[1], loc_z:loc_z+self.crop_sz[2]]
+            sample_sz = sample_mask.shape
+            if self.unmask_label is not None and sample_mask[sample_sz[0]//2,sample_sz[1]//2,sample_sz[2]//2]==self.unmask_label:
+                continue
+            else:
                 is_accept = True
-                sample_img = img[:, loc_x:loc_x+self.crop_sz[0], loc_y:loc_y+self.crop_sz[1], loc_z:loc_z+self.crop_sz[2]]        
+                sample_img = img[loc_x:loc_x+self.crop_sz[0], loc_y:loc_y+self.crop_sz[1], loc_z:loc_z+self.crop_sz[2]]        
         # data augmentation
         if self.transform is not None:
             sample_img, sample_mask = self.transform([sample_img, sample_mask])        

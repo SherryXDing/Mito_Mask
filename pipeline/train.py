@@ -15,7 +15,7 @@ data_path = '/groups/flyem/data/dingx/mask/data/'
 img_mask_name = [(data_path+'trvol-250-1.h5', data_path+'trvol-250-1-mask.h5'), \
         (data_path+'tstvol-520-1.h5', data_path+'tstvol-520-1-mask.h5')]
 
-save_path = '/groups/flyem/data/dingx/mask/model_multiclass'
+save_path = '/groups/flyem/data/dingx/mask/model_multiclass/'
 if not os.path.exists(save_path):
     os.mkdir(save_path)
 
@@ -24,23 +24,29 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # model
 depth = 3
-model = UNet(in_channels=1, base_filters=16, out_channels=3, depth=depth)
+in_channels = 1
+out_channels = 2
+base_filters = 16
+model = UNet(in_channels=in_channels, base_filters=base_filters, out_channels=out_channels, depth=depth)
 if torch.cuda.device_count()>1:
     print('---Using {} GPUs---'.format(torch.cuda.device_count()))
     model = nn.DataParallel(model)
 model.to(device)
 
 # criterion
-criterion = nn.CrossEntropyLoss(reduction='none')
+unmask_label=2
+if unmask_label is not None:
+    criterion = nn.CrossEntropyLoss(ignore_index=unmask_label, reduction='mean')
+else:
+    criterion = nn.CrossEntropyLoss(reduction='mean')
 # optimizer
 optimizer = torch.optim.SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=0.00005, nesterov=True)
-unmask_label=2
-network = NeuralNetwork(model, criterion, optimizer, device, unmask_label)
+network = NeuralNetwork(model, criterion, optimizer, device)
 # parameters
 crop_sz=(64,64,64)
 num_data = 1000
 transform = transforms.Compose([FlipSample(), RotSample(), ToTensor()])
-batch_sz = 32
+batch_sz = 64
 total_epoch = 2000
 train_loss_total = []
 eval_loss_total = []
@@ -51,7 +57,7 @@ for epoch in range(total_epoch):
     print('......Epoch {}......'.format(epoch))
     since = time.time()
     # generate data for each epoch
-    data = GenerateData_Multiclass(img_mask_name, crop_sz=crop_sz, num_data=num_data, transform=transform)
+    data = GenerateData_Multiclass(img_mask_name, unmask_label=unmask_label, crop_sz=crop_sz, num_data=num_data, transform=transform)
     indices = range(len(data))
     train_data = Subset(data, indices[:-100])
     eval_data = Subset(data, indices[-100:])
@@ -85,4 +91,3 @@ print('Total time elapse: {:.0f}hour {:.0f}min'.format(total_time//3600, total_t
 # plt.ylabel('loss')
 # plt.legend(loc='upper right')
 # plt.savefig(save_path+'/loss.pdf')
-# plt.show()

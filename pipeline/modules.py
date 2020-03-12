@@ -9,38 +9,29 @@ class NeuralNetwork():
     """
     Network class that wraps model related functions (e.g., training, evaluation, etc)
     """
-    def __init__(self, model, criterion, optimizer, device, unmask_label=None):
+    def __init__(self, model, criterion, optimizer, device):
         """
         Args:
             model: a deep neural network model (sent to device already)
             criterion: loss function
             optimizer: training optimizer
             device: training device
-            unmask_label: label number for unlabeled area
         """
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
-        self.unmask_label = unmask_label
 
 
     def masked_loss(self, out, target):
         """
-        calculate masked loss
+        calculate loss
         """
-        if out.shape != target.shape:
-            shrink_sz = ((target.shape[2]-out.shape[2])//2, (target.shape[3]-out.shape[3])//2, (target.shape[4]-out.shape[4])//2)
-            target = target[:, :, shrink_sz[0]:-shrink_sz[0], shrink_sz[1]:-shrink_sz[1], shrink_sz[2]:-shrink_sz[2]]        
-        if self.unmask_label is not None:
-            mask = target[:,-1,:,:,:]!=1  # 1 in the last channel of target indicates unlabeled area  
-        else:
-            mask = torch.ones(target.shape[0], target.shape[2], target.shape[3], target.shape[4], dtype=bool)
-        mask = mask.unsqueeze(1) 
-        target = torch.argmax(target, dim=1)
+        if out.shape[-3:] != target.shape[-3:]:
+            shrink_sz = ((target.shape[-3]-out.shape[-3])//2, (target.shape[-2]-out.shape[-2])//2, (target.shape[-1]-out.shape[-1])//2)
+            target = target[:, shrink_sz[0]:-shrink_sz[0], shrink_sz[1]:-shrink_sz[1], shrink_sz[2]:-shrink_sz[2]]
+        target = target.long()         
         loss = self.criterion(out, target)
-        loss = loss * mask
-        loss = loss.sum() / len(mask[mask])
         return loss
 
 
@@ -150,10 +141,7 @@ class NeuralNetwork():
                     patch_out = self.model(patch_img)
                     patch_out = patch_out.cpu()
                     patch_out = patch_out.detach().numpy()
-                    if self.unmask_label is not None:
-                        patch_out = np.argmax(patch_out[0,:-1,:,:,:], axis=0)
-                    else:
-                        patch_out = np.argmax(patch_out[0,:,:,:,:], axis=0)
+                    patch_out = np.argmax(patch_out[0,:,:,:,:], axis=0)
                     out[row+gap[0]:row+input_sz[0]-gap[0], col+gap[1]:col+input_sz[1]-gap[1], vol+gap[2]:vol+input_sz[2]-gap[2]] = patch_out
                     
         return out
